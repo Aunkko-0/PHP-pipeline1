@@ -12,7 +12,7 @@ pipeline {
                 script {
                     // เปลี่ยนชื่อตัวแปรเป็น GH_USER, GH_TOKEN เพื่อไม่ให้ชนกับ System Env
                     withCredentials([usernamePassword(credentialsId: CR_CREDENTIALS_ID, usernameVariable: 'GH_USER', passwordVariable: 'GH_TOKEN')]) {
-                        powershell """
+                         """
                             \$ErrorActionPreference = 'Stop'
                             
                             # Debug: เช็คว่า Jenkins อ่าน Username มาถูกไหม (Password จะถูกซ่อนเป็น ****)
@@ -31,7 +31,7 @@ pipeline {
         stage('Docker Build') {
             steps {
                 script {
-                    powershell """
+                     """
                         \$ErrorActionPreference = 'Stop'
                         Write-Host "Building Image..."
                         docker build -t ${FULL_IMAGE_NAME}:${BUILD_NUMBER} -t ${FULL_IMAGE_NAME}:latest .
@@ -43,7 +43,7 @@ pipeline {
         stage('Docker Push') {
             steps {
                 script {
-                    powershell """
+                    """
                         \$ErrorActionPreference = 'Stop'
                         Write-Host "Pushing to GitHub Packages..."
                         docker push ${FULL_IMAGE_NAME}:${BUILD_NUMBER}
