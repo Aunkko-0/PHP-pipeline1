@@ -2,10 +2,10 @@ pipeline {
     agent any
 
     environment {
-        // !!! ตรวจสอบว่า ID นี้เก็บ Username และ PAT Token ที่ถูกต้อง !!!
+        // ID ของ Credential (ต้องมี user/token)
         CR_CREDENTIALS_ID = 'webhook' 
         
-        // ชื่อ Image (ต้องเป็นตัวพิมพ์เล็กทั้งหมดตามกฎของ Docker)
+        // ชื่อ Image
         FULL_IMAGE_NAME = 'ghcr.io/aunkko-0/php-project'
     }
 
@@ -14,16 +14,17 @@ pipeline {
         stage('Docker Login') {
             steps {
                 script {
-                    // ดึง Username และ Password มาเก็บในตัวแปร GH_USER และ GH_TOKEN
                     withCredentials([usernamePassword(credentialsId: CR_CREDENTIALS_ID, usernameVariable: 'GH_USER', passwordVariable: 'GH_TOKEN')]) {
-                        powershell """
-                            \$ErrorActionPreference = 'Stop'
-                            Write-Host "Logging in to GHCR..."
-                            
-                            # ใช้ Write-Output ส่ง Token ผ่าน Pipe เข้า stdin ของ docker login
-                            # สังเกตการใช้ \\$ เพื่อ escape ให้เป็นตัวแปรของ PowerShell
-                            Write-Output \$env:GH_TOKEN | docker login ghcr.io -u \$env:GH_USER --password-stdin
-                        """
+                        if (isUnix()) {
+                            // --- โซน Linux/Mac (Shell) ---
+                            sh 'echo $GH_TOKEN | docker login ghcr.io -u $GH_USER --password-stdin'
+                        } else {
+                            // --- โซน Windows (PowerShell) ---
+                            powershell """
+                                \$ErrorActionPreference = 'Stop'
+                                Write-Output \$env:GH_TOKEN | docker login ghcr.io -u \$env:GH_USER --password-stdin
+                            """
+                        }
                     }
                 }
             }
@@ -33,11 +34,13 @@ pipeline {
         stage('Docker Build') {
             steps {
                 script {
-                    powershell """
-                        \$ErrorActionPreference = 'Stop'
-                        Write-Host "Building Image..."
-                        docker build -t ${FULL_IMAGE_NAME}:${BUILD_NUMBER} -t ${FULL_IMAGE_NAME}:latest .
-                    """
+                    def buildCmd = "docker build -t ${FULL_IMAGE_NAME}:${BUILD_NUMBER} -t ${FULL_IMAGE_NAME}:latest ."
+                    
+                    if (isUnix()) {
+                        sh buildCmd
+                    } else {
+                        powershell buildCmd
+                    }
                 }
             }
         }
@@ -46,27 +49,28 @@ pipeline {
         stage('Docker Push') {
             steps {
                 script {
-                    powershell """
-                        \$ErrorActionPreference = 'Stop'
-                        Write-Host "Pushing to GitHub Packages..."
+                    def pushCmd = """
                         docker push ${FULL_IMAGE_NAME}:${BUILD_NUMBER}
                         docker push ${FULL_IMAGE_NAME}:latest
                     """
+                    
+                    if (isUnix()) {
+                        sh pushCmd
+                    } else {
+                        powershell pushCmd
+                    }
                 }
             }
         }
     }
     
-    // (Optional) ล้าง Docker Image หลังทำเสร็จเพื่อไม่ให้รกเครื่อง
+    // --- (Optional) Clean up ---
     post {
         always {
             script {
-                powershell """
-                    Write-Host "Cleaning up..."
-                    # ลบ Image เพื่อประหยัดพื้นที่ (ถ้าต้องการ)
-                    # docker rmi ${FULL_IMAGE_NAME}:${BUILD_NUMBER} -f
-                    # docker rmi ${FULL_IMAGE_NAME}:latest -f
-                """
+                def cleanCmd = "docker rmi ${FULL_IMAGE_NAME}:${BUILD_NUMBER}"
+                // ถ้าอยากลบให้เอา comment ออก
+                // if (isUnix()) { sh cleanCmd } else { powershell cleanCmd }
             }
         }
     }
