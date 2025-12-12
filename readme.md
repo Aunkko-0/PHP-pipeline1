@@ -1,1 +1,1 @@
-ทดสอบๆ
+echo "Hello Jenkins"
