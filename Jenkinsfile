@@ -2,28 +2,32 @@ pipeline {
     agent any
 
     environment {
-        // ID ที่คุณตั้งใน Jenkins
-        CR_CREDENTIALS_ID = 'github' 
+        // ID ที่คุณตั้งใน Jenkins (ตรวจสอบให้แน่ใจว่าชื่อนี้จริงหรือไม่ เช่น 'github', 'webhook' หรือ 'github-access-token')
+        CR_CREDENTIALS_ID = 'webhook' 
         
-        // ชื่อ Image เต็มๆ ที่คุณระบุมา
-        FULL_IMAGE_NAME = 'ghcr.io/Aunkko-0/php-project'
+        // **สำคัญ:** ชื่อ Image ต้องเป็นตัวพิมพ์เล็กทั้งหมด
+        FULL_IMAGE_NAME = 'ghcr.io/aunkko-0/php-project'
     }
 
     stages {
         stage('Login & Build & Push') {
             steps {
                 script {
-                    // ดึง Username/Password มาจาก ID 'github'
+                    // ดึง Username/Password มาจาก ID
                     withCredentials([usernamePassword(credentialsId: CR_CREDENTIALS_ID, usernameVariable: 'USER', passwordVariable: 'TOKEN')]) {
                         
-                        // 1. Login เข้า GitHub Registry
-                        sh "echo $TOKEN | docker login ghcr.io -u $USER --password-stdin"
-                        
-                        // 2. Build Image (ใช้เลข Build Number เป็น Tag)
-                        sh "docker build -t ${FULL_IMAGE_NAME}:${BUILD_NUMBER} ."
-                        
-                        // 3. Push ขึ้น GitHub
-                        sh "docker push ${FULL_IMAGE_NAME}:${BUILD_NUMBER}"
+                        // ใช้ powershell แทน sh
+                        powershell """
+                            # 1. Login เข้า GitHub Registry
+                            # ใน PowerShell ใช้ $env:VAR เพื่อเรียกตัวแปร
+                            echo \$env:TOKEN | docker login ghcr.io -u \$env:USER --password-stdin
+                            
+                            # 2. Build Image
+                            docker build -t ${FULL_IMAGE_NAME}:${BUILD_NUMBER} .
+                            
+                            # 3. Push ขึ้น GitHub
+                            docker push ${FULL_IMAGE_NAME}:${BUILD_NUMBER}
+                        """
                     }
                 }
             }
@@ -32,9 +36,15 @@ pipeline {
 
     post {
         always {
-            // 4. Cleanup: ลบ Image ออกจากเครื่อง Jenkins ทันทีเพื่อประหยัดพื้นที่
-            // (ใส่ || true กัน Error กรณี Build ไม่ผ่าน)
-            sh "docker rmi ${FULL_IMAGE_NAME}:${BUILD_NUMBER} || true"
+            // 4. Cleanup: ลบ Image ออกจากเครื่อง Jenkins
+            // ใช้ powershell และตรวจสอบ logic การ error
+            powershell """
+                try {
+                    docker rmi ${FULL_IMAGE_NAME}:${BUILD_NUMBER} -Force
+                } catch {
+                    Write-Host "Image not found or already removed."
+                }
+            """
         }
     }
 }
