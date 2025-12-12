@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         // ID ของ Credential
-        CR_CREDENTIALS_ID = 'github' 
+        CR_CREDENTIALS_ID = 'webhook' 
         
         // ชื่อ Image (ตัวพิมพ์เล็ก)
         FULL_IMAGE_NAME = 'ghcr.io/aunkko-0/php-project'
